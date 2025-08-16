@@ -23,28 +23,16 @@ signal message_ended(message: DialogueMessage)
 signal line_started
 signal line_ended
 
-func _eventInConfig(event: InputEvent, config: InputConfig) -> bool:
-	if !config.keycodes.is_empty() && event is InputEventKey:
-		if config.keycodes.has(event.get_keycode_with_modifiers()):
-			return true
-	elif !config.keycodes.is_empty() && event is InputEventJoypadButton:
-		if config.joy_buttons.has(event.get_keycode_with_modifiers()):
-			return true
-	elif !config.mouse_buttons.is_empty() && event is InputEventMouseButton:
-		if config.mouse_buttons.has(event.get_keycode_with_modifiers()):
-			return true
-	return false
-
 func _unhandled_input(event: InputEvent):
-	if !processing && !event.is_echo() && _eventInConfig(event, interact_config):
+	if !processing && !event.is_echo() && interact_config.hasEvent(event):
 		if interact_ready && event.is_released() == interact_config.on_release: interact_ready = false; return
 		if !interact_ready && !event.is_released() != interact_config.on_release:
 			interact_ready = true
 			interacted.emit()
 			return
 	
-	for config in input_configs.values():
-		if event.is_released() == config.on_release && event.is_echo() == !config.oneshot && _eventInConfig(event, config):
+	for config: InputConfig in input_configs.values():
+		if event.is_released() == config.on_release && event.is_echo() == !config.oneshot && config.hasEvent(event):
 			config.pressed.emit()
 			return
 
@@ -119,6 +107,12 @@ class InputConfig:
 		self.joy_buttons = joy_buttons
 		self.mouse_buttons = mouse_buttons
 	
+	func hasEvent(event: InputEvent) -> bool:
+		if event is InputEventKey && keycodes.has(event.get_keycode_with_modifiers()): return true
+		elif event is InputEventJoypadButton && joy_buttons.has(event.button_index): return true
+		elif event is InputEventMouseButton && mouse_buttons.has(event.button_index): return true
+		return false
+	
 	static func fromAction(action: StringName, oneshot: bool = true, on_release: bool = false) -> InputConfig:
 		var input_config := InputConfig.new(oneshot, on_release)
 		var events := InputMap.action_get_events(action)
@@ -130,4 +124,3 @@ class InputConfig:
 			elif(event is InputEventJoypadButton): input_config.joy_buttons.append(event.button_index)
 			elif(event is InputEventMouseButton): input_config.mouse_buttons.append(event.button_index)
 		return input_config
-
